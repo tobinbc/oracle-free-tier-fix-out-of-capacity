@@ -1,0 +1,22 @@
+service: aws-node-scheduled-cron-project
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+useDotenv: true
+
+functions:
+  launch:
+    environment:
+      EVENT_RULE_PREFIX: 'aws-node-scheduled-cron'
+      SSH_AUTHORIZED_KEYS: ${env:SSH_AUTHORIZED_KEYS}
+      FINGERPRINT: ${env:FINGERPRINT}
+      SUBNET_ID: ${env:SUBNET_ID}
+      USER_ID: ${env:USER_ID}
+      TENANCY_ID: ${env:TENANCY_ID}
+      PRIVATE_KEY: ${env:PRIVATE_KEY}
+    handler: launch/index.handler
+    events:
+      - schedule: rate(10 minutes)
+
