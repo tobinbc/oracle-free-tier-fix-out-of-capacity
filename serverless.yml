@@ -1,22 +1,35 @@
 service: aws-node-scheduled-cron-project
-frameworkVersion: '3'
+frameworkVersion: "3"
 
 provider:
   name: aws
   runtime: nodejs18.x
+  iam:
+    role:
+      statements:
+        # send status sms
+        - Effect: "Allow"
+          Action:
+            - "SNS:Publish"
+          Resource: "*"
+        # disable cloudwatch event rule
+        - Effect: "Allow"
+          Action:
+            - "events:DisableRule"
+          Resource: "*"
 useDotenv: true
 
 functions:
   launch:
     environment:
-      EVENT_RULE_PREFIX: 'aws-node-scheduled-cron'
+      EVENT_RULE_PREFIX: "aws-node-scheduled-cron"
       SSH_AUTHORIZED_KEYS: ${env:SSH_AUTHORIZED_KEYS}
       FINGERPRINT: ${env:FINGERPRINT}
       SUBNET_ID: ${env:SUBNET_ID}
       USER_ID: ${env:USER_ID}
       TENANCY_ID: ${env:TENANCY_ID}
       PRIVATE_KEY: ${env:PRIVATE_KEY}
+      PHONE_NUMBER: ${env:PHONE_NUMBER}
     handler: launch/index.handler
     events:
-      - schedule: rate(10 minutes)
-
+      - schedule: rate(2 minutes)

@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "@aws-sdk/client-cloudwatch-events": "^3.504.0",
+    "@aws-sdk/client-sns": "^3.504.0",
     "oci-sdk": "^2.78.0"
   },
   "name": "oracle-free-tier-fix-out-of-capacity",

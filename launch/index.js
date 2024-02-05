@@ -10,7 +10,11 @@ const {
   DisableRuleCommand,
   ListRulesCommand,
 } = require("@aws-sdk/client-cloudwatch-events");
+
+const { PublishCommand, SNSClient } = require("@aws-sdk/client-sns");
+
 const client = new CloudWatchEventsClient();
+const snsClient = new SNSClient();
 
 const privateKey = process.env.PRIVATE_KEY || "";
 const tenancyId = process.env.TENANCY_ID || "";
@@ -64,14 +68,6 @@ const computeWaiter = computeClient.createWaiters(
   waiterConfiguration
 );
 
-const virtualNetworkClient = new core.VirtualNetworkClient({
-  authenticationDetailsProvider: provider,
-});
-
-const virtualNetworkWaiter = virtualNetworkClient.createWaiters(
-  workRequestClient,
-  waiterConfiguration
-);
 
 const identityClient = new identity.IdentityClient({
   authenticationDetailsProvider: provider,
@@ -127,38 +123,44 @@ module.exports.handler = async () => {
     },
   };
 
-  console.log(launchInstanceDetails);
-
   const launchInstanceRequest = {
     launchInstanceDetails: launchInstanceDetails,
   };
+  try {
+    const launchInstanceResponse = await computeClient.launchInstance(
+      launchInstanceRequest
+    );
 
-  const launchInstanceResponse = await computeClient.launchInstance(
-    launchInstanceRequest
-  );
+    const getInstanceReqeust = {
+      instanceId: launchInstanceResponse.instance.id,
+    };
 
-  const getInstanceReqeust = {
-    instanceId: launchInstanceResponse.instance.id,
-  };
+    const getInstanceResponse = await computeWaiter.forInstance(
+      getInstanceReqeust,
+      core.models.Instance.LifecycleState.Running
+    );
+    if (getInstanceResponse) {
+      console.log("Instance is now running", getInstanceResponse.instance.id);
+    }
 
-  const getInstanceResponse = await computeWaiter.forInstance(
-    getInstanceReqeust,
-    core.models.Instance.LifecycleState.Running
-  );
-  if (getInstanceResponse) {
-    console.log("Instance is now running", getInstanceResponse.instance.id);
+    // fetch list of rules
+    const rules = await client.send(
+      new ListRulesCommand({
+        NamePrefix: process.env.EVENT_RULE_PREFIX,
+      })
+    );
+    if (!rules.Rules || rules.Rules.length === 0) {
+      console.log("No rules found");
+      return;
+    }
+    await snsClient.send(
+      new PublishCommand({
+        Message: "Instance on Oracle finally launched",
+        PhoneNumber: process.env.PHONE_NUMBER,
+      })
+    );
+    await client.send(new DisableRuleCommand({ Name: rules.Rules[0].Name }));
+  } catch (e) {
+    console.log(e)
   }
-
-  // fetch list of rules
-  const rules = await client.send(
-    new ListRulesCommand({
-      NamePrefix: process.env.EVENT_RULE_PREFIX,
-    })
-  );
-  if (!rules.Rules || rules.Rules.length === 0) {
-    console.log("No rules found");
-    return;
-  }
-
-  await client.send(new DisableRuleCommand({ Name: rules.Rules[0].Name }));
 };
